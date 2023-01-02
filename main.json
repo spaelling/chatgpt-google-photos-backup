@@ -1,0 +1,87 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "apiProfile": "2018-06-01-profile",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "functionAppName": {
+            "type": "string",
+            "metadata": {
+                "description": "Name of the function app."
+            }
+        },
+        "storageAccountName": {
+            "type": "string",
+            "metadata": {
+                "description": "Name of the storage account."
+            }
+        },
+        "serverFarmName": {
+            "type": "string"
+        }
+    },
+    "variables": {
+        "location": "westeurope",
+        "runtime": "node"
+    },
+    "resources": [{
+            "type": "Microsoft.Storage/storageAccounts",
+            "name": "[parameters('storageAccountName')]",
+            "location": "[variables('location')]",
+            "sku": {
+                "name": "Standard_LRS"
+            },
+            "kind": "StorageV2",
+            "properties": {}
+        },
+        {
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2018-02-01",
+            "name": "[parameters('serverFarmName')]",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name": "Y1"
+            }
+        },
+        {
+            "type": "Microsoft.Web/sites",
+            "apiVersion": "2018-11-01",
+            "name": "[parameters('functionAppName')]",
+            "location": "[variables('location')]",
+            "kind": "functionapp,linux",
+            "properties": {
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('serverFarmName'))]",
+                "enabled": true,
+                "httpsOnly": true,
+                "siteConfig": {
+                    "appSettings": [{
+                        "name": "FUNCTIONS_WORKER_RUNTIME",
+                        "value": "[variables('runtime')]"
+                    }]
+                }
+            },
+            "resources": [{
+                "type": "config",
+                "name": "web",
+                "apiVersion": "2018-11-01",
+                "dependsOn": [
+                    "[resourceId('Microsoft.Web/Sites', parameters('functionAppName'))]"
+                ],
+                "properties": {
+                    "appSettings": [{
+                            "name": "AzureWebJobsStorage",
+                            "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', parameters('storageAccountName'), ';AccountKey=', listKeys(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), '2019-04-01').keys[0].value)]"
+                        },
+                        {
+                            "name": "FUNCTIONS_WORKER_RUNTIME",
+                            "value": "[variables('runtime')]"
+                        }
+                    ]
+                }
+            }],
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]",
+                "[resourceId('Microsoft.Web/serverfarms', parameters('serverFarmName'))]"
+            ]
+        }
+    ]
+}
